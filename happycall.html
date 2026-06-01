@@ -6,6 +6,61 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="해피콜">
 <title>해피콜 문자 생성기</title>
+
+<!-- ===== Google Analytics (GA4) ===== -->
+<!-- 측정 ID: G-T8Q2L4FXSM -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-T8Q2L4FXSM"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  // === 내 방문 제외 스위치 ===
+  // 제외할 기기에서 주소 끝에 ?mytraffic=off 를 붙여 한 번만 접속 → 이후 영구 제외
+  // 다시 포함하려면 ?mytraffic=on 으로 접속
+  (function () {
+    var GA_ID = 'G-T8Q2L4FXSM';
+    try {
+      var params = new URLSearchParams(location.search);
+      if (params.get('mytraffic') === 'off') {
+        localStorage.setItem('ga_optout', '1');
+        alert('이 기기는 이제 방문 통계에서 제외됩니다.');
+      }
+      if (params.get('mytraffic') === 'on') {
+        localStorage.removeItem('ga_optout');
+        alert('방문 통계 제외가 해제되었습니다.');
+      }
+      if (localStorage.getItem('ga_optout') === '1') {
+        window['ga-disable-' + GA_ID] = true; // gtag 공식 비활성화 플래그
+      }
+    } catch (e) { /* localStorage 불가 환경 무시 */ }
+  })();
+
+  gtag('config', 'G-T8Q2L4FXSM');
+</script>
+<!-- ===== /Google Analytics ===== -->
+
+<!-- ===== Microsoft Clarity ===== -->
+<!-- 프로젝트 ID: wzsoxra8tp / "내 방문 제외"(ga_optout) 설정 시 함께 비활성화 -->
+<script type="text/javascript">
+(function () {
+  try { if (localStorage.getItem('ga_optout') === '1') return; } catch (e) { /* 무시 */ }
+  (function(c,l,a,r,i,t,y){
+    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+  })(window, document, "clarity", "script", "wzsoxra8tp");
+})();
+</script>
+<!-- ===== /Microsoft Clarity ===== -->
+
+<!-- 이미지 생성 라이브러리 (html2canvas) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- 엑셀 읽기 라이브러리 (SheetJS) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- 워드(.docx) 읽기 라이브러리 (mammoth) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -396,6 +451,33 @@
     font-family: monospace;
     letter-spacing: 0.5px;
   }
+  .output-actions {
+    display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;
+  }
+  .output-actions .oa-btn {
+    flex: 1; min-width: 120px; padding: 14px 10px; border: none; border-radius: 11px;
+    font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .output-actions .oa-btn:active { opacity: 0.85; }
+  .output-actions .oa-imp { background: #FEE500; color: #3A2A00; }
+  .output-actions .oa-etc { background: #30d158; color: #06310f; }
+  .output-actions .oa-dl  { background: #0a84ff; color: #fff; }
+  .attach-btn {
+    width: 100%; padding: 13px; background: #2c3e63; color: #cfe0ff;
+    border: 1px solid #3f5a8a; border-radius: 11px; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .attach-btn:active { background: #25344f; }
+  .attach-hint { font-size: 12px; color: #8e8e93; margin-top: 7px; line-height: 1.5; }
+  .attach-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .attach-item { position: relative; width: 84px; height: 84px; }
+  .attach-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 9px; border: 1px solid #48484a; }
+  .attach-rm {
+    position: absolute; top: -7px; right: -7px; width: 23px; height: 23px;
+    border-radius: 50%; border: 2px solid #1c1c1e; background: #ff3b30; color: #fff;
+    font-size: 12px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  #img-render-root .ir-photo { display: block; width: 100%; border-radius: 8px; margin-top: 10px; }
 
   /* 모달 */
   .modal-backdrop {
@@ -441,6 +523,102 @@
 </head>
 <body>
 
+<!-- ===== 로그인 게이트 (Firebase) ===== -->
+<style>
+  #authGate {
+    position: fixed; inset: 0; z-index: 10000;
+    background: #2c2c2e;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  #authLoading { color: #aeaeb2; font-size: 15px; }
+  .auth-card {
+    width: 100%; max-width: 360px;
+    background: #3a3a3c;
+    border: 1px solid #5a5a5e;
+    border-radius: 16px;
+    padding: 28px 24px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  }
+  .auth-card h2 { margin: 0 0 4px; font-size: 20px; font-weight: 600; color: #f2f2f7; text-align: center; }
+  .auth-card .auth-sub { margin: 0 0 22px; font-size: 13px; color: #aeaeb2; text-align: center; }
+  .auth-field { margin-bottom: 12px; }
+  .auth-field label { display: block; font-size: 13px; color: #c7c7cc; margin-bottom: 6px; }
+  .auth-field input {
+    width: 100%; box-sizing: border-box;
+    padding: 12px 14px; font-size: 16px;
+    background: #4a4a4e; color: #f2f2f7;
+    border: 1px solid #8e8e93; border-radius: 10px;
+  }
+  .auth-field input::placeholder { color: #8e8e93; }
+  .auth-field input:focus { outline: none; border-color: #5a9fd4; }
+  .auth-btn-primary {
+    width: 100%; padding: 13px; margin-top: 6px;
+    font-size: 16px; font-weight: 600;
+    background: #0066cc; color: #fff;
+    border: none; border-radius: 10px; cursor: pointer;
+  }
+  .auth-btn-primary:active { background: #0055aa; }
+  .auth-divider { display: flex; align-items: center; gap: 10px; margin: 18px 0; color: #8e8e93; font-size: 12px; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #48484a; }
+  .auth-btn-google {
+    width: 100%; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 10px;
+    font-size: 15px; font-weight: 500;
+    background: #fff; color: #1c1c1e;
+    border: none; border-radius: 10px; cursor: pointer;
+  }
+  .auth-btn-google:active { background: #ececec; }
+  .auth-foot { margin-top: 18px; text-align: center; font-size: 14px; color: #aeaeb2; }
+  .auth-link { color: #5a9fd4; cursor: pointer; text-decoration: none; }
+  .auth-error { margin-top: 14px; padding: 10px 12px; background: rgba(255,69,58,0.12); border: 1px solid rgba(255,69,58,0.35); border-radius: 8px; color: #ff8a80; font-size: 13px; display: none; }
+  #logoutBtn {
+    position: fixed; top: 10px; right: 10px; z-index: 9000;
+    display: none; align-items: center; gap: 6px;
+    padding: 7px 12px; font-size: 12px;
+    background: #3a3a3c; color: #c7c7cc;
+    border: 1px solid #5a5a5e; border-radius: 8px; cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  #logoutBtn:active { background: #4a4a4e; }
+</style>
+
+<div id="authGate">
+  <div id="authLoading">불러오는 중…</div>
+  <div class="auth-card" id="authForm" style="display:none;">
+    <h2>🇯🇵 일본 가이드 해피콜</h2>
+    <p class="auth-sub" id="authModeSub">로그인하고 시작하세요</p>
+
+    <div class="auth-field">
+      <label>이메일</label>
+      <input type="email" id="authEmail" placeholder="example@email.com" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <label>비밀번호</label>
+      <input type="password" id="authPassword" placeholder="비밀번호 (6자 이상)" autocomplete="current-password">
+    </div>
+
+    <button class="auth-btn-primary" id="authSubmit">로그인</button>
+
+    <div class="auth-error" id="authError"></div>
+
+    <div class="auth-divider">또는</div>
+
+    <button class="auth-btn-google" id="authGoogle">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.9 2.4 30.4 0 24 0 14.6 0 6.4 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-2.8-.4-4.1H24v7.4h12.7c-.3 2.1-1.6 5.2-4.7 7.3l7.3 5.6c4.3-4 6.8-9.9 6.8-16.2z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.3-5.6c-2 1.4-4.6 2.3-8.6 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.4 42.6 14.6 48 24 48z"/></svg>
+      Google로 계속하기
+    </button>
+
+    <div class="auth-foot">
+      <span id="authToggleText">계정이 없으신가요? </span><a class="auth-link" id="authToggle">회원가입</a>
+      <div style="margin-top:8px;"><a class="auth-link" id="authReset">비밀번호를 잊으셨나요?</a></div>
+    </div>
+  </div>
+</div>
+
+<button id="logoutBtn">🔓 로그아웃</button>
+<!-- ===== /로그인 게이트 ===== -->
+
 <div class="container">
   <div class="app-header">
     <h1>🇯🇵 일본 가이드 해피콜</h1>
@@ -448,17 +626,35 @@
   </div>
 
   <div class="tab-bar">
-    <button class="tab active" id="tab-input">입력</button>
-    <button class="tab" id="tab-output">분할 문자</button>
+    <button class="tab active" id="tab-input">중요 안내사항</button>
+    <button class="tab" id="tab-output">그외 안내사항</button>
   </div>
 
   <div id="panel-input">
+
+    <button type="button" id="btn-import-confirm" class="import-trigger">🤖 확정서/일정표로 내용 채우기</button>
+    <button type="button" id="btn-edit-template" class="tpl-trigger">✏️ 고객에게 보낼 내용 기입</button>
 
     <div class="section-title">기본 정보</div>
 
     <div class="section">
       <label class="field-label">가이드명</label>
       <input type="text" id="f-guide" placeholder="예: 최광현">
+    </div>
+
+    <div class="section">
+      <label class="field-label">여행사 <span style="color:#8e8e93;font-weight:400">(선택 시 이미지 색상에 반영)</span></label>
+      <select id="f-agency">
+        <option value="">선택 안 함</option>
+        <option value="하나투어">하나투어</option>
+        <option value="모두투어">모두투어</option>
+        <option value="노랑풍선">노랑풍선</option>
+        <option value="교원투어">교원투어</option>
+        <option value="롯데관광">롯데관광</option>
+        <option value="온라인투어">온라인투어</option>
+        <option value="인터파크투어">인터파크투어</option>
+        <option value="참좋은여행">참좋은여행</option>
+      </select>
     </div>
 
     <div class="section">
@@ -554,11 +750,14 @@
       <div class="section">
         <label class="field-label">항공사</label>
         <select id="f-airline">
+          <option value="">선택</option>
           <option value="에어부산">에어부산</option>
           <option value="진에어">진에어</option>
           <option value="제주항공">제주항공</option>
           <option value="이스타항공">이스타항공</option>
+          <option value="티웨이항공">티웨이항공</option>
           <option value="대한항공">대한항공</option>
+          <option value="아시아나항공">아시아나항공</option>
           <option value="트리니티항공">트리니티항공</option>
         </select>
       </div>
@@ -653,7 +852,16 @@
       <input type="text" id="f-phone-jp" placeholder="090-0000-0000">
     </div>
 
-    <button class="btn-primary" id="btn-generate">분할 문자 만들기 →</button>
+    <div class="divider"></div>
+    <div class="section-title">사진 · 지도 첨부 <span style="font-weight:400;color:#8e8e93;font-size:13px;">(그외 안내사항 이미지에 함께 표시)</span></div>
+    <div class="section">
+      <input type="file" id="f-attach-file" accept="image/*" multiple style="display:none">
+      <button type="button" id="f-attach-btn" class="attach-btn">📷 사진/지도 추가</button>
+      <div class="attach-hint">구글맵은 캡처(스크린샷)해서 추가하세요. 여러 장 가능 (최대 6장).</div>
+      <div id="f-attach-list" class="attach-list"></div>
+    </div>
+
+    <button class="btn-primary" id="btn-generate">그외 안내사항 안내하기</button>
     <div class="status" id="save-status"></div>
     <button class="reset-btn" id="btn-reset">전체 입력 초기화</button>
   </div>
@@ -665,10 +873,14 @@
     </div>
     <button class="regen-btn" id="btn-regen">↻ 입력값으로 다시 생성 (수정 내용 초기화)</button>
     <div id="messages-container"></div>
-    <button class="btn-secondary" id="btn-back" style="margin-top: 10px;">← 입력 수정</button>
+    <div class="output-actions">
+      <button type="button" class="oa-btn oa-imp" id="oa-important">중요 안내사항 보내기</button>
+      <button type="button" class="oa-btn oa-etc" id="oa-etc">그외 안내사항 보내기</button>
+      <button type="button" class="oa-btn oa-dl" id="oa-download">다운로드</button>
+    </div>
   </div>
 
-  <div class="rev-info">rev_2026_0521_0930</div>
+  <div class="rev-info">rev_2026_0601_2231</div>
 </div>
 
 <!-- 프리셋 추가/편집 모달 -->
@@ -711,7 +923,7 @@
   const PRESET_KEY = 'happycall_weather_presets_v1';
   const LOCATION_KEY = 'happycall_location_presets_v1';
   const MAX_LEN = 1000;
-  const fieldIds = ['f-guide','f-period','f-period-start','f-period-start-text','f-period-days','f-region','f-region-custom','f-days','f-weather','f-transport-type','f-airport','f-airline','f-port','f-shipline','f-meeting-date','f-meeting-time','f-meeting-spot','f-picket','f-phone-kr','f-phone-jp'];
+  const fieldIds = ['f-guide','f-agency','f-period','f-period-start','f-period-start-text','f-period-days','f-region','f-region-custom','f-days','f-weather','f-transport-type','f-airport','f-airline','f-port','f-shipline','f-meeting-date','f-meeting-time','f-meeting-spot','f-picket','f-phone-kr','f-phone-jp'];
   const checkIds = ['opt-plug','opt-onsen','opt-baggage','opt-aizen'];
   const WEEKDAYS = ['일','월','화','수','목','금','토'];
 
@@ -756,6 +968,7 @@
   function savePresets() {
     try {
       localStorage.setItem(PRESET_KEY, JSON.stringify(presets));
+      window.dispatchEvent(new Event('happycall-data-changed'));
     } catch (e) {}
   }
 
@@ -876,6 +1089,7 @@
   function saveLocations() {
     try {
       localStorage.setItem(LOCATION_KEY, JSON.stringify(locations));
+      window.dispatchEvent(new Event('happycall-data-changed'));
     } catch (e) {}
   }
 
@@ -980,6 +1194,7 @@
     checkIds.forEach(id => { data[id] = document.getElementById(id).checked; });
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      window.dispatchEvent(new Event('happycall-data-changed'));
       const s = document.getElementById('save-status');
       s.textContent = '✓ 자동 저장됨';
       setTimeout(() => { s.textContent = ''; }, 1500);
@@ -1211,6 +1426,113 @@
   function getVal(id) { return document.getElementById(id).value.trim(); }
   function getChk(id) { return document.getElementById(id).checked; }
 
+  // ===== 안내 포맷(템플릿) =====
+  const TEMPLATE_KEY = 'happycall_templates_v1';
+  const TEMPLATE_FIELDS = [
+    { key: 'main',       label: '메인 문자 (인사·미팅·준비물·연락처)' },
+    { key: 'currency',   label: '화폐 · 금제품 · 식당' },
+    { key: 'quarantine', label: '검역' },
+    { key: 'onsen',      label: '온천 (\u2018온천 안내\u2019 켤 때 검역 뒤에 붙음)' },
+    { key: 'baggage',    label: '수하물 (\u2018수하물 안내\u2019 켤 때, 항공만)' }
+  ];
+  const PLACEHOLDERS = ['가이드명','기간','지역','일정','미팅일','미팅시각','미팅장소','공항','항구','미팅장소상세','피켓명','연락처_한국','연락처_일본','여행사','준비물'];
+
+  const DEFAULT_TEMPLATES = {
+    main: {
+      title: '중요 안내사항 (인사 · 미팅일시,장소 · 피켓명 · 준비물 · 가이드 연락처)',
+      body: `안녕하세요. {기간} 일본 {지역} 일정을 함께하게 된 {가이드명} 가이드입니다. 이번 여행의 대표자님께 여행전 문자안내를 드립니다.
+
+* 미팅일시: {미팅일} {미팅시각} 미팅
+* 미팅장소: {미팅장소}
+* 피켓명: {피켓명}
+
+< 준비물 >
+{준비물}
+
+대표자님께서는 동행하시는 일행분들께 메세지 전달 부탁드립니다.
+
+메세지와 별도로 오늘 중 전화로 연락드릴 예정이나, 전화 연락이 필요 없으시면 카톡으로 회신 주시면 연락드리지 않겠습니다.
+
+즐거운 여행이 되도록 최선을 다하겠습니다. 감사합니다.
+
+-연락처-
+한국 {연락처_한국}
+일본 {연락처_일본}`
+    },
+
+    currency: {
+      title: '화폐 · 금제품 · 식당',
+      body: `< 화폐 >
+일본은 엔화로만 사용 가능하며, 신용카드가 안되는 곳이 많습니다. 사용하실 만큼 엔화로 준비해 오시면 됩니다. 면세점 등에서 사용 가능한 카드는 VISA, MASTER 등 해외 사용 가능한 카드로 준비해 주시기 바랍니다. (일반 체크카드는 사용 불가)
+
+< 금제품 안내 >
+일본 입국시 금목걸이, 팔찌, 고가의 시계 등에 세금이 부과되는 사례가 잦습니다. 수십만원에서 백만원이 넘는 세금이 나올 수 있으니 고가 제품 착용은 자제해 주시길 권해드립니다.
+
+< 식당 >
+일본 식당은 외부음식 및 주류 반입이 불가합니다. 한국 또는 식당 밖에서 구매하신 음식·주류는 식당 내 반입이 불가하오니 참고 부탁드립니다.`
+    },
+
+    quarantine: {
+      title: '검역',
+      body: `< 검역 >
+최근 일본 검역이 매우 까다로워졌습니다. 육류(고기, 햄, 소세지 등)뿐만 아니라 채소류(상추, 깻잎 등), 과일류를 소지한 채 입국 시 식물 검역 증명서가 필요합니다. 신고하지 않고 가져가다 적발되면 최대 100만엔(약 천만원)의 벌금이 부과될 수 있습니다.`
+    },
+
+    onsen: {
+      title: '온천',
+      body: `< 온천 >
+온천 및 대욕장 입장 시 문신, 타투, 헤나 등이 있으신 분은 입장이 제한되오니 유념해 주시기 바랍니다.`
+    },
+
+    baggage: {
+      title: '수하물 안내',
+      body: `< 수하물 >
+모든 액체류는 캐리어에 넣고 위탁 수하물로 부쳐주세요. 라이타, 보조배터리, 전자담배, 무선 고데기 등 폭발 위험 제품은 위탁 불가이므로 반드시 기내 수하물로 반입하셔야 합니다.
+
+100ml 미만 액체류는 비닐에 넣어 1개까지만 기내 반입 가능합니다. 라이타 1개(지포 제외), 보조배터리는 반드시 기내에 들고 타셔야 합니다.
+
+※ 한국 다이슨 드라이기는 일본에서 작동하지 않습니다.
+※ 무선(충전식) 고데기는 일본 반입 불가, 유선 고데기만 위탁 가능합니다.
+※ 칼, 면도기, 손톱깍기, 가위 등은 반드시 위탁 수하물로 맡겨주세요.`
+    }
+  };
+
+  let templates = {};
+
+  function loadTemplates() {
+    let saved = {};
+    try { const raw = localStorage.getItem(TEMPLATE_KEY); saved = raw ? JSON.parse(raw) : {}; }
+    catch (e) { saved = {}; }
+    templates = {};
+    TEMPLATE_FIELDS.forEach(f => {
+      const def = DEFAULT_TEMPLATES[f.key] || { title: '', body: '' };
+      let s = saved ? saved[f.key] : null;
+      if (typeof s === 'string') s = { body: s };   // 옛 형식(문자열) 자동 호환
+      s = s || {};
+      templates[f.key] = {
+        title: (s.title != null && String(s.title).trim() !== '') ? s.title : def.title,
+        body:  (s.body != null) ? s.body : def.body
+      };
+    });
+    // 옛 기본 제목을 쓰고 있던 경우 새 제목으로 자동 업그레이드 (직접 수정한 제목은 그대로 둠)
+    const OLD_MAIN_TITLES = ['인사 · 미팅 · 준비물 · 연락처', '인사·미팅·준비물·연락처'];
+    if (templates.main && OLD_MAIN_TITLES.includes(templates.main.title)) {
+      templates.main.title = DEFAULT_TEMPLATES.main.title;
+    }
+  }
+  function saveTemplates() {
+    try {
+      localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
+      window.dispatchEvent(new Event('happycall-data-changed'));
+    } catch (e) {}
+  }
+  function applyTemplate(tpl, vars) {
+    return String(tpl == null ? '' : tpl).replace(/\{([^{}]+)\}/g, (m, k) => {
+      const key = k.trim();
+      return Object.prototype.hasOwnProperty.call(vars, key) ? (vars[key] == null ? '' : vars[key]) : m;
+    });
+  }
+
   function buildBlocks() {
     const guide = getVal('f-guide');
     const period = getVal('f-period');
@@ -1221,8 +1543,8 @@
     const isShip = getVal('f-transport-type') === '선박';
     const airport = getVal('f-airport');
     const port = getVal('f-port');
-    const meetingDateRaw = getVal('f-meeting-date');
-    const meetingDate = formatMeetingDate(meetingDateRaw);
+    const agency = getVal('f-agency');
+    const meetingDate = formatMeetingDate(getVal('f-meeting-date'));
     const meetingTime = getVal('f-meeting-time');
     const meetingSpot = getVal('f-meeting-spot');
     const picketRaw = getVal('f-picket');
@@ -1237,102 +1559,157 @@
     if (getChk('opt-plug')) items.push(`${idx++}. 110V 전용 플러그 (일명 돼지코)`);
     if (getChk('opt-aizen')) items.push(`${idx++}. 아이젠 (눈길 미끄럼 방지)`);
 
+    const vars = {
+      '가이드명': guide, '기간': period, '지역': region, '일정': days,
+      '미팅일': meetingDate, '미팅시각': meetingTime,
+      '미팅장소': (meetingLoc + ' ' + meetingSpot).trim(),
+      '공항': airport, '항구': port, '미팅장소상세': meetingSpot,
+      '피켓명': picket, '연락처_한국': phoneKr, '연락처_일본': phoneJp,
+      '여행사': agency, '준비물': items.join('\n')
+    };
+
     const blocks = [];
 
     blocks.push({
-      title: '인사 · 미팅 · 준비물',
-      text: `안녕하세요. ${period} 일본 ${region} 일정을 함께하게 된 ${guide} 가이드입니다. 이번 여행의 대표자님께 여행전 문자안내를 드립니다.
-
-* 미팅일시: ${meetingDate} ${meetingTime} 미팅
-* 미팅장소: ${meetingLoc} ${meetingSpot}
-* 피켓명: ${picket}
-
-< 준비물 >
-${items.join('\n')}
-
-< 날씨 >
-${weather}`
+      group: 'text',
+      title: applyTemplate(templates.main.title, vars),
+      text: applyTemplate(templates.main.body, vars)
     });
 
-    blocks.push({
-      title: '화폐 · 금제품 · 식당',
-      text: `< 화폐 >
-일본은 엔화로만 사용 가능하며, 신용카드가 안되는 곳이 많습니다. 사용하실 만큼 엔화로 준비해 오시면 됩니다. 면세점 등에서 사용 가능한 카드는 VISA, MASTER 등 해외 사용 가능한 카드로 준비해 주시기 바랍니다. (일반 체크카드는 사용 불가)
-
-< 금제품 안내 >
-일본 입국시 금목걸이, 팔찌, 고가의 시계 등에 세금이 부과되는 사례가 잦습니다. 수십만원에서 백만원이 넘는 세금이 나올 수 있으니 고가 제품 착용은 자제해 주시길 권해드립니다.
-
-< 식당 >
-일본 식당은 외부음식 및 주류 반입이 불가합니다. 한국 또는 식당 밖에서 구매하신 음식·주류는 식당 내 반입이 불가하오니 참고 부탁드립니다.`
-    });
-
-    let block3 = `< 검역 >
-최근 일본 검역이 매우 까다로워졌습니다. 육류(고기, 햄, 소세지 등)뿐만 아니라 채소류(상추, 깻잎 등), 과일류를 소지한 채 입국 시 식물 검역 증명서가 필요합니다. 신고하지 않고 가져가다 적발되면 최대 100만엔(약 천만원)의 벌금이 부과될 수 있습니다.`;
-
-    if (getChk('opt-onsen')) {
-      block3 += `\n\n< 온천 >\n온천 및 대욕장 입장 시 문신, 타투, 헤나 등이 있으신 분은 입장이 제한되오니 유념해 주시기 바랍니다.`;
+    // 날씨 (이미지로 보냄)
+    if (weather) {
+      blocks.push({ group: 'image', title: '날씨', text: weather });
     }
 
-    blocks.push({ title: '검역' + (getChk('opt-onsen') ? ' · 온천' : ''), text: block3 });
+    blocks.push({
+      group: 'image',
+      title: applyTemplate(templates.currency.title, vars),
+      text: applyTemplate(templates.currency.body, vars)
+    });
+
+    let qTitle = applyTemplate(templates.quarantine.title, vars);
+    let block3 = applyTemplate(templates.quarantine.body, vars);
+    if (getChk('opt-onsen')) {
+      const onsenTitle = applyTemplate(templates.onsen.title, vars);
+      if (onsenTitle) qTitle += ' · ' + onsenTitle;
+      block3 += '\n\n' + applyTemplate(templates.onsen.body, vars);
+    }
+    blocks.push({ group: 'image', title: qTitle, text: block3 });
 
     if (getChk('opt-baggage') && !isShip) {
       blocks.push({
-        title: '수하물 안내',
-        text: `< 수하물 >
-모든 액체류는 캐리어에 넣고 위탁 수하물로 부쳐주세요. 라이타, 보조배터리, 전자담배, 무선 고데기 등 폭발 위험 제품은 위탁 불가이므로 반드시 기내 수하물로 반입하셔야 합니다.
-
-100ml 미만 액체류는 비닐에 넣어 1개까지만 기내 반입 가능합니다. 라이타 1개(지포 제외), 보조배터리는 반드시 기내에 들고 타셔야 합니다.
-
-※ 한국 다이슨 드라이기는 일본에서 작동하지 않습니다.
-※ 무선(충전식) 고데기는 일본 반입 불가, 유선 고데기만 위탁 가능합니다.
-※ 칼, 면도기, 손톱깍기, 가위 등은 반드시 위탁 수하물로 맡겨주세요.`
+        group: 'image',
+        title: applyTemplate(templates.baggage.title, vars),
+        text: applyTemplate(templates.baggage.body, vars)
       });
     }
 
-    blocks.push({
-      title: '마무리 · 연락처',
-      text: `대표자님께서는 동행하시는 일행분들께 메세지 전달 부탁드립니다.
-
-메세지와 별도로 오늘 중 전화로 연락드릴 예정이나, 전화 연락이 필요 없으시면 카톡으로 회신 주시면 연락드리지 않겠습니다.
-
-즐거운 여행이 되도록 최선을 다하겠습니다. 감사합니다.
-
--연락처-
-한국 ${phoneKr}
-일본 ${phoneJp}`
-    });
-
     return blocks;
+  }
+
+  let imageSections = []; // 이미지로 묶을 섹션들 [{idx, title}]
+  let imageFontPx = 28;   // 이미지 기본 글자 크기(px) — 보통28(기본) / 크게30 / 아주크게34 (이미지 폭 660px·줄간격 축소 기준)
+
+  // ===== 사진·지도 첨부 (그외 안내사항 이미지에 포함) =====
+  let attachImages = [];          // 압축된 dataURL 배열 (기기 로컬 저장, 클라우드 동기화 안 함)
+  const ATTACH_KEY = 'happycall_attach_v1';
+  const ATTACH_MAX = 6;
+
+  function loadAttach() {
+    try { const raw = localStorage.getItem(ATTACH_KEY); attachImages = raw ? JSON.parse(raw) : []; }
+    catch (e) { attachImages = []; }
+    if (!Array.isArray(attachImages)) attachImages = [];
+  }
+  function saveAttach() {
+    try { localStorage.setItem(ATTACH_KEY, JSON.stringify(attachImages)); }
+    catch (e) { alert('사진 저장 공간이 부족해요. 일부 사진을 지우거나 더 작은 사진을 써주세요.'); }
+  }
+  function compressImage(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지 로드 실패')); };
+      img.src = url;
+    });
+  }
+  function renderAttachList() {
+    const list = document.getElementById('f-attach-list');
+    if (!list) return;
+    list.innerHTML = '';
+    attachImages.forEach((src, i) => {
+      const item = document.createElement('div');
+      item.className = 'attach-item';
+      item.innerHTML = `<img src="${src}" alt="첨부 ${i + 1}"><button type="button" class="attach-rm" data-i="${i}" aria-label="삭제">✕</button>`;
+      list.appendChild(item);
+    });
+    list.querySelectorAll('.attach-rm').forEach(b => {
+      b.addEventListener('click', () => {
+        attachImages.splice(parseInt(b.dataset.i), 1);
+        saveAttach(); renderAttachList();
+      });
+    });
+  }
+
+  // 여행사별 대표 색상 (대략적인 브랜드 색 — 다르면 알려주시면 바꿔드려요)
+  const AGENCY_THEME = {
+    '하나투어':    { bg: '#6E2B8C', text: '#ffffff', accent: '#00B5D8' },
+    '모두투어':    { bg: '#00A14B', text: '#ffffff', accent: '#A6CE39' },
+    '노랑풍선':    { bg: '#FFC600', text: '#1f2937', accent: '#E8920C' },
+    '교원투어':    { bg: '#EE5A24', text: '#ffffff', accent: '#F9A03F' },
+    '롯데관광':    { bg: '#0046AD', text: '#ffffff', accent: '#E60012' },
+    '온라인투어':  { bg: '#00A0E2', text: '#ffffff', accent: '#ED3A3A' },
+    '인터파크투어': { bg: '#3A4DFF', text: '#ffffff', accent: '#7C8AFF' },
+    '참좋은여행':  { bg: '#0089CF', text: '#ffffff', accent: '#00B4E0' }
+  };
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function updateImgCount(idx) {
+    const len = document.getElementById('body-' + idx).value.length;
+    const el = document.getElementById('count-' + idx);
+    if (el) el.textContent = len + '자';
   }
 
   function renderBlocks(blocks) {
     const container = document.getElementById('messages-container');
     container.innerHTML = '';
-    blocks.forEach((block, i) => {
-      const card = document.createElement('div');
-      card.className = 'msg-card';
-      card.innerHTML = `
-        <div class="msg-header">
-          <span class="msg-title">${i+1}편. ${block.title}</span>
-          <div class="msg-meta">
-            <span class="msg-count" id="count-${i}">0자</span>
-            <button class="msg-copy" data-idx="${i}">복사</button>
-          </div>
-        </div>
-        <textarea class="msg-body-edit" id="body-${i}" rows="10"></textarea>
-        <div class="edit-hint">✏️ 위 내용을 직접 수정할 수 있습니다</div>
-      `;
-      container.appendChild(card);
-      const textarea = document.getElementById('body-' + i);
-      textarea.value = block.text;
-      updateCount(i);
-      autoResize(textarea);
-      textarea.addEventListener('input', () => {
-        updateCount(i);
-        autoResize(textarea);
-      });
-    });
-
+    imageSections = [];
+    let order = 0;
+    let i = 0;
+    while (i < blocks.length) {
+      if (blocks[i].group === 'image') {
+        // 연속된 이미지 블록을 한 그룹으로 묶음
+        order++;
+        const group = [];
+        while (i < blocks.length && blocks[i].group === 'image') {
+          group.push({ block: blocks[i], idx: i });
+          i++;
+        }
+        renderImageGroup(container, order, group);
+      } else {
+        order++;
+        renderTextCard(container, order, blocks[i], i);
+        i++;
+      }
+    }
+    // 텍스트 복사 버튼 연결
     container.querySelectorAll('.msg-copy').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.idx);
@@ -1340,6 +1717,226 @@ ${weather}`
         copyText(text, btn);
       });
     });
+  }
+
+  function renderTextCard(container, order, block, idx) {
+    const card = document.createElement('div');
+    card.className = 'msg-card';
+    card.innerHTML = `
+      <div class="msg-header">
+        <span class="msg-title">${order}. 📝 ${block.title}</span>
+        <div class="msg-meta">
+          <span class="msg-count" id="count-${idx}">0자</span>
+          <button class="msg-copy" data-idx="${idx}">복사</button>
+        </div>
+      </div>
+      <textarea class="msg-body-edit" id="body-${idx}" rows="10"></textarea>
+      <div class="edit-hint">✏️ 위 내용을 직접 수정할 수 있습니다</div>
+    `;
+    container.appendChild(card);
+    const ta = document.getElementById('body-' + idx);
+    ta.value = block.text;
+    updateCount(idx);
+    autoResize(ta);
+    ta.addEventListener('input', () => { updateCount(idx); autoResize(ta); });
+  }
+
+  function renderImageGroup(container, order, group) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-card img-group';
+    let inner = `
+      <div class="msg-header">
+        <span class="msg-title">${order}. 🖼️ 그외 안내사항</span>
+        <button class="img-make-btn" id="img-make-btn">이미지로 저장</button>
+      </div>
+      <div class="img-group-hint">아래 내용이 한 장의 이미지로 만들어집니다. 내용은 수정할 수 있어요.</div>
+      <div class="img-fontsize">글자 크기
+        <button type="button" class="fs-btn" data-px="28">보통</button>
+        <button type="button" class="fs-btn" data-px="30">크게</button>
+        <button type="button" class="fs-btn" data-px="34">아주 크게</button>
+      </div>
+    `;
+    group.forEach(g => {
+      inner += `
+        <div class="img-sub">
+          <div class="img-sub-head">
+            <span class="img-sub-title">${g.block.title}</span>
+            <span class="msg-count" id="count-${g.idx}">0자</span>
+          </div>
+          <textarea class="msg-body-edit" id="body-${g.idx}" rows="6"></textarea>
+        </div>`;
+    });
+    wrap.innerHTML = inner;
+    container.appendChild(wrap);
+
+    imageSections = group.map(g => ({ idx: g.idx, title: g.block.title }));
+
+    group.forEach(g => {
+      const ta = document.getElementById('body-' + g.idx);
+      ta.value = g.block.text;
+      updateImgCount(g.idx);
+      autoResize(ta);
+      ta.addEventListener('input', () => { updateImgCount(g.idx); autoResize(ta); });
+    });
+
+    document.getElementById('img-make-btn').addEventListener('click', generateImage);
+
+    wrap.querySelectorAll('.fs-btn').forEach(b => {
+      if (parseInt(b.dataset.px) === imageFontPx) b.classList.add('active');
+      b.addEventListener('click', () => {
+        imageFontPx = parseInt(b.dataset.px);
+        wrap.querySelectorAll('.fs-btn').forEach(x => x.classList.toggle('active', x === b));
+      });
+    });
+  }
+
+  // ===== 이미지 생성 =====
+  function buildImageHTML() {
+    const regionSel = getVal('f-region');
+    const region = regionSel === '__custom__' ? getVal('f-region-custom') : regionSel;
+    const period = getVal('f-period');
+    const guide = getVal('f-guide');
+    const agency = getVal('f-agency');
+    const subParts = [region, period].filter(Boolean).join('  ·  ');
+    const theme = AGENCY_THEME[agency] || { bg: '#11254e', text: '#ffffff', accent: '#0a84ff' };
+    const accent = theme.accent || theme.bg;
+
+    let html = `<div class="ir-header" style="background:${theme.bg};color:${theme.text}">
+      <div class="ir-flag">JP</div>
+      <div class="ir-htext">
+        <div class="ir-title">일본 여행 안내</div>
+        ${subParts ? `<div class="ir-sub" style="color:${theme.text}">${escapeHtml(subParts)}</div>` : ''}
+      </div>
+      ${agency ? `<div class="ir-agency">${escapeHtml(agency)}</div>` : ''}
+    </div>`;
+
+    imageSections.forEach(s => {
+      const ta = document.getElementById('body-' + s.idx);
+      if (!ta) return;
+      const text = ta.value.trim();
+      if (!text) return;
+      html += `<div class="ir-section">
+        <div class="ir-sec-title" style="border-left-color:${accent}">${escapeHtml(s.title)}</div>
+        <div class="ir-sec-body">${escapeHtml(text)}</div>
+      </div>`;
+    });
+
+    if (attachImages && attachImages.length) {
+      html += `<div class="ir-section">
+        <div class="ir-sec-title" style="border-left-color:${accent}">📍 안내 사진 · 지도</div>
+        ${attachImages.map(src => `<img class="ir-photo" src="${src}" alt="">`).join('')}
+      </div>`;
+    }
+
+    const footParts = [agency, guide ? guide + ' 가이드' : ''].filter(Boolean).join('  ·  ');
+    if (footParts) html += `<div class="ir-foot">${escapeHtml(footParts)} 드림</div>`;
+    return html;
+  }
+
+  // 메인 인사 문구를 이미지로 (같은 헤더/색상 사용)
+  function buildGreetingHTML() {
+    const regionSel = getVal('f-region');
+    const region = regionSel === '__custom__' ? getVal('f-region-custom') : regionSel;
+    const period = getVal('f-period');
+    const guide = getVal('f-guide');
+    const agency = getVal('f-agency');
+    const subParts = [region, period].filter(Boolean).join('  ·  ');
+    const theme = AGENCY_THEME[agency] || { bg: '#11254e', text: '#ffffff', accent: '#0a84ff' };
+    const greetingEl = document.getElementById('body-0');
+    const greeting = greetingEl ? greetingEl.value.trim() : '';
+    let html = `<div class="ir-header" style="background:${theme.bg};color:${theme.text}">
+      <div class="ir-flag">JP</div>
+      <div class="ir-htext">
+        <div class="ir-title">일본 여행 안내</div>
+        ${subParts ? `<div class="ir-sub" style="color:${theme.text}">${escapeHtml(subParts)}</div>` : ''}
+      </div>
+      ${agency ? `<div class="ir-agency">${escapeHtml(agency)}</div>` : ''}
+    </div>`;
+    html += `<div class="ir-section"><div class="ir-sec-body">${escapeHtml(greeting)}</div></div>`;
+    const footParts = [agency, guide ? guide + ' 가이드' : ''].filter(Boolean).join('  ·  ');
+    if (footParts) html += `<div class="ir-foot">${escapeHtml(footParts)} 드림</div>`;
+    return html;
+  }
+
+  async function renderHtmlToDataUrl(html) {
+    const root = document.getElementById('img-render-root');
+    root.innerHTML = html;
+    root.style.fontSize = imageFontPx + 'px';
+    root.style.display = 'block';
+    try {
+      // 첨부 사진 등 이미지가 모두 로드될 때까지 대기 (안 그러면 빈칸으로 캡처될 수 있음)
+      const imgs = Array.from(root.querySelectorAll('img'));
+      await Promise.all(imgs.map(im => (im.complete && im.naturalWidth)
+        ? Promise.resolve()
+        : new Promise(res => { im.onload = res; im.onerror = res; })));
+      const canvas = await html2canvas(root, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+      return canvas.toDataURL('image/png');
+    } finally {
+      root.style.display = 'none';
+    }
+  }
+
+  async function dataUrlToFile(durl, name) {
+    const blob = await (await fetch(durl)).blob();
+    return new File([blob], name, { type: 'image/png' });
+  }
+
+  async function generateImage() {
+    if (typeof html2canvas !== 'function') {
+      alert('이미지 변환 기능을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    const btn = document.getElementById('img-make-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '만드는 중…'; }
+    try {
+      const dataUrl = await renderHtmlToDataUrl(buildImageHTML());
+      showImageResult(dataUrl);
+    } catch (e) {
+      alert('이미지 생성에 실패했습니다: ' + (e && e.message ? e.message : e));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '이미지로 저장'; }
+    }
+  }
+
+  function showImageResult(dataUrl) {
+    const ov = document.getElementById('img-result-overlay');
+    document.getElementById('img-result-pic').src = dataUrl;
+
+    ov.onclick = (e) => { if (e.target === ov) ov.style.display = 'none'; };
+
+    const dl = document.getElementById('img-download');
+    dl.href = dataUrl;
+    dl.download = '일본여행안내.png';
+
+    const greetingEl = document.getElementById('body-0');
+    const greeting = (greetingEl && greetingEl.value.trim()) ? greetingEl.value.trim() : '';
+
+    const shareTextBtn = document.getElementById('img-share-text');
+    const shareBtn = document.getElementById('img-share');
+
+    if (navigator.share) {
+      // ① 인사 문구만 (글자 메시지)
+      shareTextBtn.style.display = greeting ? '' : 'none';
+      shareTextBtn.onclick = async () => {
+        try { await navigator.share({ text: greeting }); } catch (e) { /* 취소 등 */ }
+      };
+      // ② 이미지만
+      shareBtn.style.display = '';
+      shareBtn.onclick = async () => {
+        try {
+          const f2 = await dataUrlToFile(dataUrl, '여행안내.png');
+          if (navigator.canShare && navigator.canShare({ files: [f2] })) {
+            await navigator.share({ files: [f2] });
+          } else {
+            alert('이 기기에서는 이미지 공유가 안 돼요. 다운로드한 뒤 보내주세요.');
+          }
+        } catch (e) { /* 취소 등 */ }
+      };
+    } else {
+      shareTextBtn.style.display = 'none';
+      shareBtn.style.display = 'none';
+    }
+    ov.style.display = 'flex';
   }
 
   function updateCount(idx) {
@@ -1376,6 +1973,9 @@ ${weather}`
   }
 
   function showCopied(btn) {
+    // 해피콜 문자 복사 = 실제 사용 신호
+    try { if (typeof gtag === 'function') gtag('event', 'copy_message', { page: 'happycall' }); } catch(e){}
+    try { if (typeof clarity === 'function') clarity('event', 'copy_message'); } catch(e){}
     const originalText = btn.textContent;
     btn.textContent = '✓ 복사됨';
     btn.classList.add('copied');
@@ -1386,6 +1986,8 @@ ${weather}`
   }
 
   document.getElementById('btn-generate').addEventListener('click', () => {
+    try { if (typeof gtag === 'function') gtag('event', 'generate_message', { page: 'happycall' }); } catch(e){}
+    try { if (typeof clarity === 'function') clarity('event', 'generate_message'); } catch(e){}
     saveData();
     const blocks = buildBlocks();
     renderBlocks(blocks);
@@ -1399,7 +2001,70 @@ ${weather}`
     }
   });
 
-  document.getElementById('btn-back').addEventListener('click', () => switchTab('input'));
+  // 결과 탭 하단 빠른 버튼
+  document.getElementById('oa-important').addEventListener('click', async (e) => {
+    const el = document.getElementById('body-0');
+    const txt = el ? el.value.trim() : '';
+    if (!txt) { alert('먼저 "그외 안내사항 안내하기"로 내용을 만들어 주세요.'); return; }
+    if (navigator.share) {
+      try { await navigator.share({ text: txt }); } catch (err) { /* 취소 등 */ }
+    } else {
+      copyText(txt, e.currentTarget);
+    }
+  });
+  document.getElementById('oa-etc').addEventListener('click', async (e) => {
+    if (typeof html2canvas !== 'function') { alert('이미지 변환 기능을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
+    if (!document.getElementById('img-make-btn')) { alert('먼저 "그외 안내사항 안내하기"로 내용을 만들어 주세요.'); return; }
+    const b = e.currentTarget; const o = b.textContent;
+    b.disabled = true; b.textContent = '만드는 중…';
+    try {
+      const dataUrl = await renderHtmlToDataUrl(buildImageHTML());
+      if (navigator.share) {
+        const file = await dataUrlToFile(dataUrl, '여행안내.png');
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file] });
+        } else { showImageResult(dataUrl); }
+      } else { showImageResult(dataUrl); }
+    } catch (err) { /* 취소 등 */ }
+    finally { b.disabled = false; b.textContent = o; }
+  });
+  document.getElementById('oa-download').addEventListener('click', async (e) => {
+    if (typeof html2canvas !== 'function') { alert('이미지 변환 기능을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.'); return; }
+    if (!document.getElementById('img-make-btn')) { alert('먼저 "그외 안내사항 안내하기"로 내용을 만들어 주세요.'); return; }
+    const b = e.currentTarget; const o = b.textContent;
+    b.disabled = true; b.textContent = '만드는 중…';
+    try {
+      const dataUrl = await renderHtmlToDataUrl(buildImageHTML());
+      const a = document.createElement('a');
+      a.href = dataUrl; a.download = '일본여행안내.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (err) {
+      alert('이미지 생성에 실패했습니다: ' + (err && err.message ? err.message : err));
+    } finally { b.disabled = false; b.textContent = o; }
+  });
+
+  // 사진·지도 첨부 이벤트
+  loadAttach();
+  renderAttachList();
+  (function () {
+    const btn = document.getElementById('f-attach-btn');
+    const file = document.getElementById('f-attach-file');
+    if (!btn || !file) return;
+    btn.addEventListener('click', () => file.click());
+    file.addEventListener('change', async () => {
+      const files = Array.from(file.files || []);
+      btn.disabled = true; const o = btn.textContent; btn.textContent = '추가하는 중…';
+      for (const f of files) {
+        if (attachImages.length >= ATTACH_MAX) { alert('사진은 최대 ' + ATTACH_MAX + '장까지 추가할 수 있어요.'); break; }
+        if (!/^image\//.test(f.type)) { alert('이미지 파일만 추가할 수 있어요: ' + f.name); continue; }
+        try { const durl = await compressImage(f, 1200, 0.82); attachImages.push(durl); }
+        catch (err) { alert('이미지를 불러오지 못했어요: ' + f.name); }
+      }
+      saveAttach(); renderAttachList();
+      btn.disabled = false; btn.textContent = o;
+      file.value = '';
+    });
+  })();
 
   document.getElementById('btn-reset').addEventListener('click', () => {
     if (confirm('정말로 모든 입력 정보를 지우시겠습니까?\n(가이드명, 연락처 등 저장된 정보가 사라집니다)\n※ 날씨 포맷은 유지됩니다')) {
@@ -1420,6 +2085,9 @@ ${weather}`
       document.getElementById('period-display').textContent = '';
       updateMeetingDateDisplay();
       toggleRegionCustom();
+      attachImages = []; saveAttach(); renderAttachList();
+      // 비운 상태를 localStorage + 클라우드에도 저장해서, 다시 열 때 옛 데이터가 되돌아오지 않게 함
+      saveData();
     }
   });
 
@@ -1431,8 +2099,995 @@ ${weather}`
 
   loadPresets();
   loadLocations();
+  loadTemplates();
   loadSaved();
+
+  // 클라우드에서 데이터를 받아오면 화면을 다시 채움
+  window.happycallReloadFromCloud = function () {
+    loadPresets();
+    loadLocations();
+    loadTemplates();
+    loadSaved();
+  };
+  window.addEventListener('happycall-cloud-loaded', function () {
+    if (window.happycallReloadFromCloud) window.happycallReloadFromCloud();
+  });
+
+  // ===== 확정서 자동 채우기 =====
+  const HC_IMPORT_PROMPT = `아래 첨부한 일본 여행 확정서에서 정보를 추출해, 아래 JSON 형식으로만 답해주세요. 설명·마크다운 없이 JSON만 출력하세요. 모르는 값은 빈 문자열("")로 두세요.
+
+{
+  "region": "여행 지역 (예: 오사카, 도쿄, 후쿠오카, 대마도, 오키나와, 북해도, 마츠야마, 나고야)",
+  "agency": "여행사명 (하나투어/모두투어/노랑풍선/교원투어/롯데관광/온라인투어/인터파크투어/참좋은여행 중, 없으면 빈칸)",
+  "startDate": "출발일/첫날 (YYYY-MM-DD)",
+  "nights": "박수(숫자만, 예: 2)",
+  "transport": "항공 또는 선박",
+  "airport": "이용 공항 (항공일 때, 예: 김해국제공항)",
+  "airline": "항공사 (있으면)",
+  "port": "이용 항구 (선박일 때)",
+  "meetingDate": "미팅 날짜 (YYYY-MM-DD, 보통 첫날)",
+  "meetingTime": "미팅 시각 (예: 07시 또는 07:00)",
+  "meetingSpot": "미팅 장소 상세",
+  "picket": "피켓명/팀명/대표자명 (있으면)"
+}`;
+
+  function setSelectIfOption(id, value) {
+    if (!value) return false;
+    const el = document.getElementById(id);
+    if (!el) return false;
+    const v = String(value).trim();
+    const opts = Array.from(el.options);
+    let opt = opts.find(o => o.value === v);
+    if (!opt) opt = opts.find(o => o.value && o.value !== '__custom__' && (v.includes(o.value) || o.value.includes(v)));
+    if (opt) { el.value = opt.value; return true; }
+    return false;
+  }
+
+  // 확정서 불러오기 전, 트립 정보 비우기 (가이드명·연락처는 본인 것이므로 유지)
+  function clearForImport() {
+    // 가이드명·연락처는 비우지 않음 — 각 가이드가 자기 계정에 한 번 입력한 값이 유지됨
+    const keep = ['f-guide', 'f-phone-kr', 'f-phone-jp'];
+    fieldIds.forEach(id => {
+      if (keep.includes(id)) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.tagName === 'SELECT') el.selectedIndex = 0;
+      else el.value = (id === 'f-port') ? '부산항 국제여객터미널' : '';
+    });
+    const days = document.getElementById('f-period-days'); if (days) days.value = '4';
+    ['f-meeting-date-text', 'f-period-start-text'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const pd = document.getElementById('period-display'); if (pd) pd.textContent = '';
+    if (typeof toggleTransport === 'function') toggleTransport();
+    if (typeof toggleRegionCustom === 'function') toggleRegionCustom();
+    if (typeof updateMeetingDateDisplay === 'function') updateMeetingDateDisplay();
+  }
+
+  function fillFromExtracted(d) {
+    // 의미 있는 정보가 있을 때만 비우고 채움 (빈/오류 파일로 폼이 통째로 지워지는 것 방지)
+    const hasData = ['region', 'startDate', 'nights', 'transport', 'meetingTime', 'meetingSpot', 'picket', 'airport', 'airline'].some(k => d[k]);
+    if (!hasData) return [];
+    clearForImport();
+    const filled = [];
+    if (d.agency && setSelectIfOption('f-agency', d.agency)) filled.push('여행사');
+    if (d.region) {
+      if (setSelectIfOption('f-region', d.region)) filled.push('지역');
+      else {
+        document.getElementById('f-region').value = '__custom__';
+        document.getElementById('f-region-custom').value = String(d.region).trim();
+        filled.push('지역(직접입력)');
+      }
+      toggleRegionCustom();
+    }
+    if (d.transport) {
+      const t = /선박|페리|크루즈|배편|선사/.test(String(d.transport)) ? '선박' : '항공';
+      document.getElementById('f-transport-type').value = t;
+      toggleTransport();
+      filled.push('교통수단');
+    }
+    if (d.startDate && /^\d{4}-\d{2}-\d{2}$/.test(d.startDate)) {
+      document.getElementById('f-period-start').value = d.startDate;
+      if (typeof syncPeriodStartText === 'function') syncPeriodStartText();
+      filled.push('시작일');
+    }
+    const nights = parseInt(d.nights);
+    if (!isNaN(nights)) {
+      const days = nights + 1;
+      if (days >= 1 && days <= 10) {
+        document.getElementById('f-period-days').value = String(days);
+        filled.push('기간');
+      }
+      const daysEl = document.getElementById('f-days');
+      if (daysEl) { daysEl.value = days + '일'; filled.push('일정'); }
+    }
+    if (typeof calculatePeriod === 'function') calculatePeriod();
+
+    let md = (d.meetingDate && /^\d{4}-\d{2}-\d{2}$/.test(d.meetingDate)) ? d.meetingDate : '';
+    if (!md && d.startDate && /^\d{4}-\d{2}-\d{2}$/.test(d.startDate)) md = d.startDate;
+    if (md) {
+      document.getElementById('f-meeting-date').value = md;
+      if (typeof syncDateText === 'function') syncDateText();
+      filled.push('미팅일');
+    }
+    if (d.meetingTime) { document.getElementById('f-meeting-time').value = String(d.meetingTime).trim(); filled.push('미팅시각'); }
+    if (d.meetingSpot) { document.getElementById('f-meeting-spot').value = String(d.meetingSpot).trim(); filled.push('미팅장소'); }
+    if (d.picket) { document.getElementById('f-picket').value = String(d.picket).trim(); filled.push('피켓명'); }
+    if (d.airport && setSelectIfOption('f-airport', d.airport)) filled.push('공항');
+    if (d.airline && setSelectIfOption('f-airline', d.airline)) filled.push('항공사');
+    if (d.port) { document.getElementById('f-port').value = String(d.port).trim(); filled.push('항구'); }
+    if (d.shipline) { document.getElementById('f-shipline').value = String(d.shipline).trim(); filled.push('선사'); }
+
+    // 가이드·연락처는 확정서에 적힌 담당 가이드 정보로 채움 (여러 가이드 공용)
+    // 가이드명·연락처는 비어 있을 때만 채움 — 본인이 한 번 입력하면 그대로 유지됨
+    const setIfEmpty = (id, val, label) => {
+      const el = document.getElementById(id);
+      if (val && el && !el.value.trim()) { el.value = String(val).trim(); filled.push(label); }
+    };
+    setIfEmpty('f-guide', d.guide, '가이드명');
+    setIfEmpty('f-phone-kr', d.phoneKr, '한국연락처');
+    setIfEmpty('f-phone-jp', d.phoneJp, '일본연락처');
+
+    if (typeof saveData === 'function') saveData();
+    return filled;
+  }
+
+  // 셀 객체({t,v,w,z})를 문자열로. 날짜/시간 서식 셀은 SheetJS의 SSF로
+  // 일련번호를 직접 변환해 시간대 영향을 받지 않게 함 (JS Date 변환 시 KST에서 하루 밀리는 버그 회피).
+  function cellToStr(cell) {
+    if (cell == null) return '';
+    if (cell.t === 'n' && typeof cell.v === 'number' && cell.z &&
+        typeof XLSX !== 'undefined' && XLSX.SSF && XLSX.SSF.is_date(cell.z)) {
+      try {
+        const o = XLSX.SSF.parse_date_code(cell.v);
+        if (o) {
+          if (cell.v < 1 || (o.y <= 1900 && o.d === 0)) {
+            let H = o.H, M = o.M;
+            if (o.S >= 30) { M += 1; if (M === 60) { M = 0; H = (H + 1) % 24; } }
+            return String(H).padStart(2, '0') + ':' + String(M).padStart(2, '0');
+          }
+          return o.y + '-' + String(o.m).padStart(2, '0') + '-' + String(o.d).padStart(2, '0');
+        }
+      } catch (e) {}
+    }
+    if (cell.w != null && cell.w !== '') return String(cell.w);
+    return cell.v == null ? '' : String(cell.v);
+  }
+
+  function sheetToText(ws) {
+    if (!ws || !ws['!ref']) return '';
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const lines = [];
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      const cells = [];
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const s = cellToStr(ws[XLSX.utils.encode_cell({ r: R, c: C })]);
+        if (s !== '') cells.push(s);
+      }
+      lines.push(cells.join(' '));
+    }
+    return lines.join('\n');
+  }
+
+  function handleDocxImport(file) {
+    const status = document.getElementById('import-status');
+    if (typeof mammoth === 'undefined') {
+      status.style.color = '#ff8a80';
+      status.textContent = '워드 읽기 기능을 불러오지 못했어요. "AI로 분석"을 이용해 주세요.';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      mammoth.extractRawText({ arrayBuffer: e.target.result }).then(r => {
+        const data = parseConfirmText(r.value || '');
+        const filled = fillFromExtracted(data);
+        reportImport(filled, data._notes);
+      }).catch(err => {
+        status.style.color = '#ff8a80';
+        status.textContent = '워드를 읽지 못했어요: ' + (err && err.message ? err.message : err);
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function handleExcelImport(file) {
+    const status = document.getElementById('import-status');
+    if (typeof XLSX === 'undefined') {
+      status.style.color = '#ff8a80';
+      status.textContent = '엑셀 기능을 불러오는 중입니다. 잠시 후 다시 시도해 주세요.';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false, cellNF: true });
+        let allText = '';
+        wb.SheetNames.forEach(name => {
+          allText += sheetToText(wb.Sheets[name]) + '\n';
+        });
+        const data = parseConfirmText(allText);
+        const filled = fillFromExtracted(data);
+        reportImport(filled, data._notes);
+      } catch (err) {
+        status.style.color = '#ff8a80';
+        status.textContent = '엑셀을 읽지 못했어요: ' + (err && err.message ? err.message : err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function parseConfirmText(text) {
+    const d = {};
+    const pad = s => String(s).padStart(2, '0');
+    const DRE = '(20\\d{2})\\s*[년年.\\-\\/]\\s*(\\d{1,2})\\s*[월月.\\-\\/]\\s*(\\d{1,2})';
+    const ymd = m => `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+
+    // 날짜: 기간 > 출발일 > "날짜 출발" > 예약코드(…YYMMDD+영문3) > (작성일/제출일/FROM/DATE 제외) 첫 날짜
+    let m = text.match(new RegExp('기\\s*간[^\\n]*?' + DRE))
+         || text.match(new RegExp('출\\s*발\\s*일\\s*[:：]?\\s*' + DRE))
+         || text.match(new RegExp(DRE + '\\s*[일日]?[가-힣\\s]{0,6}출발'));
+    if (m) d.startDate = ymd(m);
+    if (!d.startDate) { const c = text.match(/(\d{2})(\d{2})(\d{2})[A-Z]{3}\b/); if (c) d.startDate = `20${c[1]}-${c[2]}-${c[3]}`; }
+    if (!d.startDate) { const cl = text.replace(/(작성일|제출일자|DATE|FROM)[^\n]*\n/gi, '\n'); m = cl.match(new RegExp(DRE)); if (m) d.startDate = ymd(m); }
+
+    // 박수: 기간 두 날짜 차이 > 출발일·도착일 차이 > NんD(3N4D) > (N)박
+    const diffDays = (a, b) => Math.round((Date.UTC(+b[0], +b[1] - 1, +b[2]) - Date.UTC(+a[0], +a[1] - 1, +a[2])) / 86400000);
+    let nn = null;
+    const two = text.match(new RegExp('기\\s*간[^\\n]*?' + DRE + '[^\\n]*?' + DRE));
+    if (two) { const n = diffDays([two[1], two[2], two[3]], [two[4], two[5], two[6]]); if (n >= 0 && n <= 12) nn = n; }
+    if (nn == null) {
+      const ar = text.match(new RegExp('도\\s*착\\s*일\\s*[:：]?\\s*' + DRE));
+      if (ar && d.startDate) { const sp2 = d.startDate.split('-'); const n = diffDays(sp2, [ar[1], ar[2], ar[3]]); if (n >= 0 && n <= 12) nn = n; }
+    }
+    if (nn == null) { const nd = text.match(/(\d+)\s*[Nn]\s*\d+\s*[Dd]/); if (nd) nn = parseInt(nd[1]); }
+    if (nn == null) { const nm = text.match(/\(?(\d+)\)?\s*박/); if (nm) nn = parseInt(nm[1]); }
+    if (nn != null) d.nights = nn;
+
+    // 지역 (드롭다운 우선 → 동의어/지명)
+    const regions = ['후쿠오카', '오사카', '도쿄', '오키나와', '대마도', '북해도', '마츠야마', '나고야'];
+    const syn = [['남큐슈', '남큐슈'], ['아오모리', '아오모리'], ['동경', '도쿄'], ['나리타', '도쿄'], ['하네다', '도쿄'], ['신주쿠', '도쿄'], ['간사이', '오사카'], ['삿포로', '북해도'], ['신치토세', '북해도'], ['치토세', '북해도'], ['하코다테', '북해도'], ['큐슈', '후쿠오카']];
+    for (const r of regions) { if (text.includes(r)) { d.region = r; break; } }
+    if (!d.region) { for (const [k, v] of syn) { if (text.includes(k)) { d.region = v; break; } } }
+
+    if (/선박|페리|배편|크루즈/.test(text)) d.transport = '선박';
+    else if (/항공|항공편|국제공항|편명|[A-Z]{2}\s?\d{3,4}/.test(text)) d.transport = '항공';
+
+    for (const a of Object.keys(AGENCY_THEME)) { if (text.includes(a)) { d.agency = a; break; } }
+
+    // 미팅 시각·장소 (집결 / 集)
+    const mt = text.match(/(\d{1,2})\s*:\s*(\d{2})\s*集/)
+            || text.match(/(\d{1,2})\s*:\s*(\d{2})(?::\d{2})?[^\n]{0,40}?집결/)
+            || text.match(/(?:[\s|]|^)([01]?\d|2[0-3])([0-5]\d)\s+[가-힣][가-힣 ]{0,12}?(?:집결|미팅)/);
+    if (mt) d.meetingTime = `${pad(mt[1])}:${mt[2]}`;
+    const sn = text.match(/([가-힣][가-힣 ]*?공항)[^\n]{0,12}?(?:집결|集合|集|미팅)/);
+    const sd = text.match(/(?:집결|集)[^\n]*?\(([^)]+)\)/);
+    const sp = [];
+    if (sn) sp.push(sn[1].replace(/\s+/g, ' ').trim());
+    if (sd) sp.push(sd[1].trim());
+    if (sp.length) d.meetingSpot = sp.join(' ');
+
+    // 항공사(편명) · 공항
+    const fm = text.match(/\b([A-Z]{2})\s?\d{3,4}\b/);
+    const AIRLINE = { LJ: '진에어', BX: '에어부산', '7C': '제주항공', ZE: '이스타항공', KE: '대한항공', TW: '티웨이', OZ: '아시아나' };
+    if (fm && AIRLINE[fm[1]]) d.airline = AIRLINE[fm[1]];
+    if (/김해|부산\s*(?:국제)?공항|부산\s*김해/.test(text)) d.airport = '김해국제공항';
+    else if (/인천/.test(text)) d.airport = '인천국제공항';
+    else if (/대구\s*(?:국제)?공항|TAE/.test(text)) d.airport = '대구국제공항';
+    else if (/청주\s*(?:국제)?공항/.test(text)) d.airport = '청주국제공항';
+
+    // 가이드명·연락처 (라벨이 있을 때만 — 고객 번호 오인 방지)
+    const gm = text.match(/가이드\s*(?:명)?\s*[:：]?\s*([가-힣]{2,4})\s*가이드/)
+            || text.match(/가이드명\s*[|\s]*([가-힣]{2,4})/)
+            || text.match(/(?:현지가이드|가\s*이\s*드)\s*[:：]?\s*([가-힣]\s?[가-힣]\s?[가-힣]?)\s*\(/);
+    if (gm) d.guide = gm[1].replace(/\s/g, '');
+    const pk = text.match(/(?:한국|가이드\s*연락처)[^\n0-9]{0,8}(01[016789][-\s]?\d{3,4}[-\s]?\d{4})/);
+    if (pk) d.phoneKr = pk[1].replace(/\s/g, '');
+    const pj = text.match(/일본[^\n0-9]{0,8}(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4})/);
+    if (pj) d.phoneJp = pj[1].replace(/\s/g, '');
+
+    // 자동으로 못 넣은 항목과 이유
+    d._notes = [];
+    const isRoster = /여권\s*번호|PASSPORT|주민\s*등?록?\s*번호/i.test(text) && !d.startDate;
+    if (isRoster) {
+      d._notes.push('이 파일은 승객 명단이라 일정·출발일 정보가 없어요. 일정표(확정서)를 넣거나 직접 입력해주세요.');
+    } else {
+      if (!d.startDate) {
+        const multi = /출발\s*확정/.test(text)
+          || (text.match(/\([월화수목금토일]\s*[出출]\)/g) || []).length >= 2
+          || (text.match(/\d{1,2}\s*\/\s*\d{1,2}\s*\(?\s*출/g) || []).length >= 2;
+        if (multi) d._notes.push('출발일이 여러 개라(예: 0208, 0222…) 하나로 정할 수 없어요. 출발일을 직접 골라 입력해주세요.');
+        else d._notes.push('출발일을 찾지 못했어요(확정서 양식이 달라서요). 직접 입력하거나 "AI로 분석"을 써보세요.');
+      }
+      if (!d.region) d._notes.push('여행 지역을 찾지 못했어요 — 직접 선택해주세요.');
+      if (!d.nights) d._notes.push('여행 기간(박수)을 찾지 못했어요 — 직접 선택해주세요.');
+      if (d.startDate && !d.meetingTime) d._notes.push('이 확정서엔 미팅(집결) 시각이 적혀 있지 않아요 — 직접 입력해주세요.');
+    }
+
+    return d;
+  }
+
+  function reportImport(filled, notes) {
+    const status = document.getElementById('import-status');
+    let html = '';
+    if (filled && filled.length) html += '<div style="color:#7ee787">✓ 채운 항목: ' + filled.map(escapeHtml).join(', ') + '</div>';
+    if (notes && notes.length) html += '<div style="color:#ffcc66;margin-top:8px;line-height:1.65">⚠ 자동으로 못 넣은 것 & 이유<br>• ' + notes.map(escapeHtml).join('<br>• ') + '</div>';
+    if ((!filled || !filled.length) && (!notes || !notes.length)) html = '<span style="color:#ff8a80">자동으로 찾은 항목이 없어요. "AI로 분석"을 이용하거나 직접 입력해주세요.</span>';
+    status.innerHTML = html;
+    // 완벽히 채웠을 때만(이유 없음) 자동으로 입력 화면으로. 이유가 있으면 읽도록 모달 유지.
+    if (filled && filled.length && (!notes || !notes.length)) {
+      setTimeout(() => { document.getElementById('import-overlay').style.display = 'none'; switchTab('input'); }, 1300);
+    }
+  }
+
+  function runImport() {
+    const raw = document.getElementById('import-text').value.trim();
+    const status = document.getElementById('import-status');
+    if (!raw) { status.style.color = '#ff8a80'; status.textContent = '확정서 내용 또는 Claude가 준 JSON을 붙여넣어 주세요.'; return; }
+    let data = null;
+    const jsonStr = raw.replace(/```json|```/g, '').trim();
+    if (jsonStr.startsWith('{')) { try { data = JSON.parse(jsonStr); } catch (e) { data = null; } }
+    if (!data) data = parseConfirmText(raw);
+    const filled = fillFromExtracted(data);
+    reportImport(filled, data._notes);
+  }
+
+  function openImportModal() {
+    const ov = document.getElementById('import-overlay');
+    document.getElementById('import-status').textContent = '';
+    document.getElementById('import-text').value = '';
+    ov.style.display = 'flex';
+    document.getElementById('import-copy-prompt').onclick = async () => {
+      const b = document.getElementById('import-copy-prompt');
+      try { await navigator.clipboard.writeText(HC_IMPORT_PROMPT); }
+      catch (e) { const ta = document.getElementById('import-text'); ta.value = HC_IMPORT_PROMPT; ta.focus(); ta.select(); }
+      const o = b.textContent; b.textContent = '✓ 복사됨';
+      setTimeout(() => { b.textContent = o; }, 1500);
+    };
+    document.getElementById('import-run').onclick = runImport;
+    const excelBtn = document.getElementById('import-excel-btn');
+    const excelFile = document.getElementById('import-excel-file');
+    excelBtn.onclick = () => excelFile.click();
+    excelFile.onchange = () => {
+      const f = excelFile.files && excelFile.files[0];
+      if (f) { if (/\.docx$/i.test(f.name)) handleDocxImport(f); else handleExcelImport(f); }
+      excelFile.value = '';
+    };
+    document.getElementById('import-close').onclick = () => { ov.style.display = 'none'; switchTab('input'); };
+    ov.onclick = (e) => { if (e.target === ov) ov.style.display = 'none'; };
+  }
+
+  document.getElementById('btn-import-confirm').addEventListener('click', openImportModal);
+
+  // ===== 안내 포맷 편집 모달 =====
+  (function setupTemplateEditor() {
+    let built = false;
+    const areas = {};   // 내용 textarea
+    const backs = {};   // 내용 하이라이트 배경
+    const titles = {};  // 제목 input
+    let lastFocused = null;
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function highlight(ta) {
+      const back = backs[ta.dataset.key];
+      if (!back) return;
+      back.innerHTML = escapeHtml(ta.value).replace(/\{[^{}]*\}/g, m => '<mark class="ph">' + m + '</mark>') + '\n';
+    }
+    function autoGrow(ta) {
+      ta.style.height = 'auto';
+      ta.style.height = (ta.scrollHeight) + 'px';
+    }
+    function refresh(ta) { highlight(ta); autoGrow(ta); }
+
+    function insertAtCursor(text) {
+      const el = lastFocused || areas['main'];
+      if (!el) return;
+      el.focus();
+      const s = el.selectionStart, e = el.selectionEnd;
+      el.value = el.value.slice(0, s) + text + el.value.slice(e);
+      const pos = s + text.length;
+      el.setSelectionRange(pos, pos);
+      if (el.tagName === 'TEXTAREA' && el.dataset.key) refresh(el);
+    }
+
+    function buildOnce() {
+      if (built) return;
+      const chipsWrap = document.getElementById('tpl-chips');
+      const secWrap = document.getElementById('tpl-sections');
+      PLACEHOLDERS.forEach(p => {
+        const c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'tpl-chip';
+        c.textContent = '{' + p + '}';
+        c.addEventListener('click', () => insertAtCursor('{' + p + '}'));
+        chipsWrap.appendChild(c);
+      });
+      TEMPLATE_FIELDS.forEach(f => {
+        const sec = document.createElement('div');
+        sec.className = 'tpl-sec';
+        const head = document.createElement('div');
+        head.className = 'tpl-sec-head';
+        const lab = document.createElement('span');
+        lab.className = 'tpl-sec-label';
+        lab.textContent = f.label;
+        const rst = document.createElement('button');
+        rst.type = 'button';
+        rst.className = 'tpl-sec-reset';
+        rst.textContent = '↺ 기본';
+        rst.addEventListener('click', () => {
+          titles[f.key].value = DEFAULT_TEMPLATES[f.key].title;
+          areas[f.key].value = DEFAULT_TEMPLATES[f.key].body;
+          refresh(areas[f.key]);
+        });
+        head.appendChild(lab); head.appendChild(rst);
+        sec.appendChild(head);
+
+        // 제목 입력
+        const tIn = document.createElement('input');
+        tIn.type = 'text';
+        tIn.className = 'tpl-title';
+        tIn.placeholder = '제목';
+        tIn.addEventListener('focus', () => { lastFocused = tIn; });
+        titles[f.key] = tIn;
+        sec.appendChild(tIn);
+        const tHint = document.createElement('div');
+        tHint.className = 'tpl-title-hint';
+        tHint.textContent = (f.key === 'main')
+          ? '↑ 제목 — 미리보기 정리용이에요 (고객 문자엔 표시되지 않아요)'
+          : '↑ 제목 — 이미지 안내의 머리글로 고객에게 표시돼요';
+        sec.appendChild(tHint);
+
+        // 내용 입력
+        const field = document.createElement('div');
+        field.className = 'tpl-field';
+        const back = document.createElement('div');
+        back.className = 'tpl-backdrop';
+        const ta = document.createElement('textarea');
+        ta.dataset.key = f.key;
+        ta.spellcheck = false;
+        ta.addEventListener('focus', () => { lastFocused = ta; });
+        ta.addEventListener('input', () => refresh(ta));
+        areas[f.key] = ta;
+        backs[f.key] = back;
+        field.appendChild(back); field.appendChild(ta);
+        sec.appendChild(field);
+
+        secWrap.appendChild(sec);
+      });
+
+      const ov = document.getElementById('template-overlay');
+      document.getElementById('tpl-close').addEventListener('click', () => { ov.style.display = 'none'; });
+      ov.addEventListener('click', (e) => { if (e.target === ov) ov.style.display = 'none'; });
+      document.getElementById('tpl-save').addEventListener('click', () => {
+        TEMPLATE_FIELDS.forEach(f => {
+          templates[f.key] = { title: titles[f.key].value, body: areas[f.key].value };
+        });
+        saveTemplates();
+        const st = document.getElementById('tpl-status');
+        st.textContent = '✓ 저장됐어요. \u2018그외 안내사항 안내하기\u2019를 누르면 이 포맷으로 만들어져요.';
+        setTimeout(() => { ov.style.display = 'none'; }, 1500);
+      });
+      document.getElementById('tpl-reset-all').addEventListener('click', () => {
+        if (confirm('모든 안내 포맷(제목·내용)을 기본값으로 되돌릴까요?\n(저장하기를 눌러야 최종 반영됩니다)')) {
+          TEMPLATE_FIELDS.forEach(f => {
+            titles[f.key].value = DEFAULT_TEMPLATES[f.key].title;
+            areas[f.key].value = DEFAULT_TEMPLATES[f.key].body;
+            refresh(areas[f.key]);
+          });
+        }
+      });
+      built = true;
+    }
+
+    function openModal() {
+      buildOnce();
+      loadTemplates();
+      TEMPLATE_FIELDS.forEach(f => {
+        const t = templates[f.key] || DEFAULT_TEMPLATES[f.key];
+        titles[f.key].value = t.title;
+        areas[f.key].value = t.body;
+      });
+      document.getElementById('tpl-status').textContent = '';
+      document.getElementById('template-overlay').style.display = 'flex';
+      requestAnimationFrame(() => { TEMPLATE_FIELDS.forEach(f => refresh(areas[f.key])); });
+    }
+
+    document.getElementById('btn-edit-template').addEventListener('click', openModal);
+  })();
 })();
 </script>
+<!-- ===== 이미지 안내 카드 (생성용 + 결과) ===== -->
+<style>
+  /* 출력 화면의 이미지 그룹 카드 */
+  .img-group { border: 1px solid #30506e; }
+  .img-make-btn {
+    background: #0a84ff; color: #fff; border: none;
+    padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .img-make-btn:active { background: #0066cc; }
+  .img-make-btn:disabled { opacity: 0.6; }
+  .img-group-hint { font-size: 12px; color: #aeaeb2; margin: 4px 0 10px; }
+  .img-fontsize { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: #aeaeb2; margin: 0 0 12px; }
+  .fs-btn {
+    padding: 6px 12px; border-radius: 8px; font-size: 13px; font-family: inherit;
+    background: #3a3a3c; color: #d1d1d6; border: 1px solid #5a5a5e; cursor: pointer;
+  }
+  .fs-btn.active { background: #0a84ff; color: #fff; border-color: #0a84ff; font-weight: 600; }
+  .img-sub { margin-bottom: 12px; }
+  .img-sub-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .img-sub-title { font-size: 14px; font-weight: 600; color: #5a9fd4; }
+
+  /* 화면 밖 렌더링용 카드 (실제 이미지로 캡처됨) */
+  #img-render-root {
+    position: fixed; left: -99999px; top: 0;
+    width: 660px; background: #ffffff; color: #1f2937;
+    font-size: 18px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  #img-render-root .ir-header {
+    display: flex; align-items: center; gap: 16px;
+    background: #11254e; color: #fff; padding: 30px 28px 22px;
+  }
+  #img-render-root .ir-htext { flex: 1; }
+  #img-render-root .ir-flag { font-size: 2.1em; line-height: 1; font-weight: 800; }
+  #img-render-root .ir-agency { font-size: 0.95em; font-weight: 700; opacity: 0.92; white-space: nowrap; }
+  #img-render-root .ir-title { font-size: 1.5em; font-weight: 800; letter-spacing: -0.01em; }
+  #img-render-root .ir-sub { font-size: 0.82em; opacity: 0.82; margin-top: 4px; }
+  #img-render-root .ir-section { padding: 16px 28px; border-bottom: 1px solid #eef0f4; }
+  #img-render-root .ir-sec-title {
+    font-size: 1.2em; font-weight: 700; color: #11254e;
+    padding-left: 12px; border-left: 5px solid #0a84ff; margin-bottom: 8px;
+  }
+  #img-render-root .ir-sec-body {
+    font-size: 1.08em; line-height: 1.5; color: #2b3440;
+    white-space: pre-wrap; word-break: keep-all;
+  }
+  #img-render-root .ir-foot {
+    padding: 12px 28px; text-align: right; font-size: 13px; color: #6b7280; background: #f8fafc;
+  }
+
+  /* 결과 오버레이 */
+  #img-result-overlay {
+    position: fixed; inset: 0; z-index: 10001;
+    background: rgba(0,0,0,0.85); display: none;
+    flex-direction: column; align-items: center;
+    padding: 16px; overflow: auto;
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  #img-result-overlay .ir-actions {
+    display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 12px; position: sticky; top: 0;
+  }
+  #img-result-overlay .ir-btn {
+    padding: 11px 18px; border-radius: 10px; font-size: 15px; font-weight: 600;
+    border: none; cursor: pointer; text-decoration: none; display: inline-block;
+  }
+  #img-result-overlay .ir-btn-share { background: #30d158; color: #06310f; }
+  #img-result-overlay .ir-btn-both { background: #0a84ff; color: #fff; }
+  #img-result-overlay .ir-btn-text { background: #FEE500; color: #3A2A00; }
+  #img-result-overlay .ir-btn-dl { background: #0a84ff; color: #fff; }
+  #img-result-overlay .ir-btn-close { background: #48484a; color: #f2f2f7; }
+  #img-result-overlay .ir-savehint { color: #d1d1d6; font-size: 13px; margin-bottom: 10px; text-align: center; }
+  #img-result-overlay img {
+    max-width: 100%; width: auto; border-radius: 10px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  }
+</style>
+
+<div id="img-render-root"></div>
+
+<div id="img-result-overlay">
+  <div class="ir-actions">
+    <button class="ir-btn ir-btn-text" id="img-share-text">중요 안내사항 보내기 (인사 · 미팅일시,장소 · 피켓명 · 준비물 · 가이드 연락처)</button>
+    <button class="ir-btn ir-btn-share" id="img-share">그외 안내사항 보내기</button>
+    <a class="ir-btn ir-btn-dl" id="img-download">💾 다운로드</a>
+  </div>
+  <div class="ir-savehint">📱 휴대폰: <b>"중요 안내사항"</b>을 먼저 보내고, <b>"그외 안내사항"</b>(이미지)을 보내면 순서대로 가요. (닫으려면 창 바깥 어두운 곳을 누르세요)<br>💻 PC: 중요 안내사항은 복사해서 붙여넣고, 그외 안내사항은 "다운로드" 후 보내세요.</div>
+  <img id="img-result-pic" alt="여행 안내 이미지">
+</div>
+<!-- ===== /이미지 안내 카드 ===== -->
+
+<!-- ===== 확정서 자동 채우기 ===== -->
+<style>
+  .import-trigger {
+    width: 100%; padding: 13px; margin-bottom: 18px;
+    background: #2c3e63; color: #cfe0ff; border: 1px solid #3f5a8a;
+    border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  .import-trigger:active { background: #25344f; }
+  #import-overlay {
+    position: fixed; inset: 0; z-index: 10001;
+    background: rgba(0,0,0,0.8); display: none;
+    align-items: center; justify-content: center; padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  #import-overlay .import-card {
+    width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
+    background: #3a3a3c; border: 1px solid #5a5a5e; border-radius: 16px; padding: 22px;
+  }
+  #import-overlay h3 { margin: 0 0 4px; font-size: 18px; color: #f2f2f7; }
+  #import-overlay .import-desc { font-size: 13px; color: #aeaeb2; margin: 0 0 16px; line-height: 1.6; }
+  #import-overlay .import-step { font-size: 13px; color: #c7c7cc; margin: 14px 0 6px; font-weight: 600; }
+  #import-overlay .import-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  #import-overlay .ib {
+    padding: 10px 14px; border-radius: 9px; font-size: 14px; font-weight: 600;
+    border: none; cursor: pointer; text-decoration: none; display: inline-block; flex: 1; text-align: center;
+  }
+  #import-overlay .ib-copy { background: #5a5a5e; color: #fff; }
+  #import-overlay .ib-claude { background: #d97757; color: #fff; }
+  #import-overlay .ib-gpt { background: #10a37f; color: #fff; }
+  #import-overlay .ib-gemini { background: #1a73e8; color: #fff; }
+  #import-overlay .ib-excel { background: #1e7e4f; color: #fff; }
+  #import-overlay .import-sub { font-size: 12.5px; color: #aeaeb2; line-height: 1.55; margin: 4px 0 8px; }
+  #import-overlay .import-prompt-quote { display: block; background: #3a3a3c; color: #ffd479; border-radius: 8px; padding: 8px 10px; margin: 5px 0; font-size: 13px; }
+  #import-overlay textarea {
+    width: 100%; box-sizing: border-box; margin-top: 6px;
+    min-height: 120px; padding: 12px; font-size: 14px;
+    background: #4a4a4e; color: #f2f2f7; border: 1px solid #8e8e93; border-radius: 10px;
+    font-family: inherit; resize: vertical;
+  }
+  #import-overlay .import-fill {
+    width: 100%; padding: 13px; margin-top: 12px;
+    background: #0a84ff; color: #fff; border: none; border-radius: 10px;
+    font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  #import-overlay .import-fill:active { background: #0066cc; }
+  #import-overlay .import-close {
+    width: 100%; padding: 10px; margin-top: 8px;
+    background: transparent; color: #aeaeb2; border: none; font-size: 14px; cursor: pointer;
+  }
+  #import-overlay .import-status { font-size: 13px; margin-top: 10px; line-height: 1.5; }
+
+  /* 안내 포맷 편집 */
+  .tpl-trigger {
+    width: 100%; padding: 14px; margin-bottom: 18px;
+    background: #ff9500; color: #fff; border: none;
+    border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer;
+    font-family: inherit; box-shadow: 0 2px 10px rgba(255,149,0,0.35);
+  }
+  .tpl-trigger:active { background: #e08600; }
+  #template-overlay {
+    position: fixed; inset: 0; z-index: 10001;
+    background: rgba(0,0,0,0.8); display: none;
+    align-items: center; justify-content: center; padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+  #template-overlay .tpl-card {
+    width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+    background: #3a3a3c; border: 1px solid #5a5a5e; border-radius: 16px; padding: 22px;
+  }
+  #template-overlay h3 { margin: 0 0 4px; font-size: 18px; color: #f2f2f7; }
+  #template-overlay .tpl-desc { font-size: 12.5px; color: #aeaeb2; margin: 0 0 14px; line-height: 1.6; }
+  #template-overlay .tpl-desc code { background: #4a4a4e; color: #cfe0ff; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  #template-overlay .tpl-warn {
+    background: #4a3a1a; border: 1px solid #b8860b; color: #ffe6a0;
+    border-radius: 10px; padding: 11px 13px; margin-bottom: 16px;
+    font-size: 12.5px; line-height: 1.65;
+  }
+  #template-overlay .tpl-warn b { color: #ffd24d; }
+  #template-overlay .tpl-warn code { background: #5c4a22; color: #ffe6a0; padding: 1px 5px; border-radius: 5px; font-size: 12px; }
+  #template-overlay .tpl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  #template-overlay .tpl-chip {
+    padding: 5px 9px; border-radius: 7px; font-size: 12px; cursor: pointer;
+    background: #4a4a4e; color: #cfe0ff; border: 1px solid #6a6a6e; font-family: inherit;
+  }
+  #template-overlay .tpl-chip:active { background: #0a84ff; color: #fff; }
+  #template-overlay .tpl-sec { margin-bottom: 16px; }
+  #template-overlay .tpl-title {
+    width: 100%; box-sizing: border-box; margin: 2px 0 3px;
+    padding: 9px 11px; font-size: 14px; font-weight: 700;
+    background: #4a4a4e; color: #ffd24d; border: 1px solid #8e8e93; border-radius: 9px;
+    font-family: inherit;
+  }
+  #template-overlay .tpl-title-hint { font-size: 11px; color: #8e8e93; margin: 0 2px 6px; }
+  #template-overlay .tpl-sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+  #template-overlay .tpl-sec-label { font-size: 13px; color: #c7c7cc; font-weight: 600; }
+  #template-overlay .tpl-sec-reset {
+    background: transparent; color: #8e8e93; border: 1px solid #5a5a5e; border-radius: 6px;
+    font-size: 11px; padding: 3px 8px; cursor: pointer; font-family: inherit;
+  }
+  #template-overlay .tpl-sec-reset:active { color: #fff; border-color: #8e8e93; }
+  #template-overlay .tpl-field { position: relative; }
+  #template-overlay .tpl-backdrop {
+    position: absolute; inset: 0; margin: 0; pointer-events: none; overflow: hidden;
+    box-sizing: border-box; padding: 11px; border: 1px solid transparent; border-radius: 10px;
+    font-size: 13.5px; line-height: 1.55; font-family: inherit;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;
+    color: #f2f2f7; background: #4a4a4e;
+  }
+  #template-overlay .tpl-backdrop mark.ph { background: transparent; color: #ffb340; font-weight: 700; }
+  #template-overlay textarea {
+    position: relative; display: block; width: 100%; box-sizing: border-box;
+    min-height: 70px; padding: 11px; font-size: 13.5px; line-height: 1.55;
+    background: transparent; color: transparent; caret-color: #ffffff;
+    border: 1px solid #8e8e93; border-radius: 10px;
+    font-family: inherit; resize: none; overflow: hidden;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: break-word;
+  }
+  #template-overlay textarea::selection { background: rgba(10,132,255,0.4); }
+  #template-overlay .tpl-save {
+    width: 100%; padding: 13px; margin-top: 6px;
+    background: #1e7e4f; color: #fff; border: none; border-radius: 10px;
+    font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  #template-overlay .tpl-save:active { background: #18613d; }
+  #template-overlay .tpl-reset-all {
+    width: 100%; padding: 10px; margin-top: 8px;
+    background: transparent; color: #ff8a80; border: 1px solid #6a4a4a; border-radius: 10px;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  #template-overlay .tpl-close {
+    width: 100%; padding: 10px; margin-top: 8px;
+    background: transparent; color: #aeaeb2; border: none; font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  #template-overlay .tpl-status { font-size: 13px; margin-top: 10px; line-height: 1.5; color: #6dd58c; text-align: center; }
+</style>
+
+<div id="import-overlay">
+  <div class="import-card">
+    <h3>🤖 확정서/일정표로 내용 채우기</h3>
+    <p class="import-desc">확정서 내용을 붙여넣으면 자동으로 채워요. <b>이미지·한글·PDF</b>는 코드가 못 읽으니, 아래 명령어를 복사해 AI(챗GPT·재미나이·클로드)에 확정서를 첨부하고 받은 <b>JSON</b>을 붙여넣으세요.</p>
+
+    <div class="import-step">1) 엑셀·워드 파일이면 — 바로 불러오기</div>
+    <div class="import-row">
+      <button type="button" class="ib ib-excel" id="import-excel-btn">📊 엑셀·워드 불러오기</button>
+    </div>
+    <input type="file" id="import-excel-file" accept=".xlsx,.xls,.csv,.docx" style="display:none">
+
+    <div class="import-step">2) 이미지·한글·PDF면 — AI로 분석</div>
+    <p class="import-sub"><b>명령어(프롬프트)</b>
+      <span class="import-prompt-quote">붙여넣은 이 확정서를 읽고 가이드명·날짜·미팅정보 등을 JSON 형식으로 정리해줘</span>
+      👉 아래 AI 중 하나를 열고, 위 명령어(복사 버튼)와 함께 확정서(이미지·한글·PDF)를 첨부하세요. 받은 JSON을 3번 칸에 붙여넣으면 돼요.</p>
+    <button type="button" class="ib ib-copy" id="import-copy-prompt" style="width:100%;flex:none;margin-bottom:8px;">📋 명령어(프롬프트) 복사</button>
+    <div class="import-row">
+      <a class="ib ib-gpt" href="https://chatgpt.com/" target="_blank" rel="noopener">챗GPT ↗</a>
+      <a class="ib ib-gemini" href="https://gemini.google.com/app" target="_blank" rel="noopener">재미나이 ↗</a>
+      <a class="ib ib-claude" href="https://claude.ai/new" target="_blank" rel="noopener">클로드 ↗</a>
+    </div>
+
+    <div class="import-step">3) 확정서 텍스트 또는 Claude가 준 JSON 붙여넣기</div>
+    <textarea id="import-text" placeholder="여기에 확정서 내용(엑셀/텍스트)을 붙여넣거나, Claude가 준 JSON을 붙여넣으세요"></textarea>
+
+    <button type="button" class="import-fill" id="import-run">채우기</button>
+    <div class="import-status" id="import-status"></div>
+    <button type="button" class="import-close" id="import-close">닫기</button>
+  </div>
+</div>
+<!-- ===== /확정서 자동 채우기 ===== -->
+
+<!-- ===== 안내 포맷 편집 ===== -->
+<div id="template-overlay">
+  <div class="tpl-card">
+    <h3>✏️ 고객에게 보낼 내용 기입</h3>
+    <p class="tpl-desc">가이드님께서 자주 사용하시는 문구를 직접 넣으실 수 있습니다. (아무것도 안 바꾸고 아래 샘플 양식 그대로 보내셔도 됩니다.)<br>주황색 <code>{ }</code> 부분은 확정서·일정표에서 추출한 값이 <b>자동으로</b> 들어가도록 해 놓은 자리입니다.<br>아래 항목(<b>메인 문자 · 화폐·금제품·식당 · 검역 · 온천 · 수하물</b>) 모두 자유롭게 수정하실 수 있어요. 입력칸을 누른 뒤 자리표시자 칩을 탭하면 커서 위치에 삽입됩니다.</p>
+    <div class="tpl-chips" id="tpl-chips"></div>
+    <div class="tpl-warn">⚠️ <b>주황색 { } 글씨는 손대지 마세요!</b><br>확정서를 불러오면 그 자리에 날짜·지역·미팅시각 등이 <b>자동으로</b> 채워지는 칸이에요. 글자를 지우거나 바꾸면 자동 입력이 안 됩니다. (예: <code>{지역}</code> → 북해도)<br>주황색이 아닌 일반 글씨(안내 문구)만 자유롭게 고쳐 주세요.</div>
+    <div id="tpl-sections"></div>
+    <button type="button" class="tpl-save" id="tpl-save">저장하기</button>
+    <button type="button" class="tpl-reset-all" id="tpl-reset-all">↺ 전체 기본 포맷으로 되돌리기</button>
+    <div class="tpl-status" id="tpl-status"></div>
+    <button type="button" class="tpl-close" id="tpl-close">닫기</button>
+  </div>
+</div>
+<!-- ===== /안내 포맷 편집 ===== -->
+
+<!-- ===== Firebase 인증 로직 ===== -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js';
+  import {
+    getAuth, onAuthStateChanged,
+    signInWithEmailAndPassword, createUserWithEmailAndPassword,
+    GoogleAuthProvider, signInWithPopup, signOut, sendPasswordResetEmail,
+    setPersistence, browserLocalPersistence
+  } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js';
+  import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDqA0UG3aibV4AcQLHGNPBSNRLeN-jbtmM",
+    authDomain: "japan-entry-form-594e0.firebaseapp.com",
+    projectId: "japan-entry-form-594e0",
+    storageBucket: "japan-entry-form-594e0.firebasestorage.app",
+    messagingSenderId: "940599688044",
+    appId: "1:940599688044:web:9fffd55468ccc034311149"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  // 다음 단계(동기화)에서 쓰려고 전역에 노출
+  window.fbAuth = auth;
+  window.fbDb = db;
+
+  // ===== Firestore 데이터 동기화 =====
+  const HC_KEYS = {
+    form: 'happycall_form_v4',
+    presets: 'happycall_weather_presets_v1',
+    locations: 'happycall_location_presets_v1',
+    templates: 'happycall_templates_v1'
+  };
+  let currentUid = null;
+  let pushTimer = null;
+
+  function readLocal(key) {
+    try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch (e) { return null; }
+  }
+  function writeLocal(key, val) {
+    try { if (val !== null && val !== undefined) localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+
+  async function pullFromCloud(uid) {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists() && snap.data().happycall) {
+        const hc = snap.data().happycall;
+        if (hc.form) writeLocal(HC_KEYS.form, hc.form);
+        if (hc.presets) writeLocal(HC_KEYS.presets, hc.presets);
+        if (hc.locations) writeLocal(HC_KEYS.locations, hc.locations);
+        if (hc.templates) writeLocal(HC_KEYS.templates, hc.templates);
+        // 화면을 클라우드 데이터로 새로고침
+        window.dispatchEvent(new Event('happycall-cloud-loaded'));
+      } else {
+        // 클라우드에 데이터가 없으면 → 지금 로컬 데이터를 클라우드로 올림(최초 이전)
+        await pushToCloud(uid);
+      }
+    } catch (e) { console.warn('동기화 불러오기 실패:', e); }
+  }
+
+  async function pushToCloud(uid) {
+    if (!uid) return;
+    try {
+      await setDoc(doc(db, 'users', uid), {
+        happycall: {
+          form: readLocal(HC_KEYS.form) || {},
+          presets: readLocal(HC_KEYS.presets) || [],
+          locations: readLocal(HC_KEYS.locations) || [],
+          templates: readLocal(HC_KEYS.templates) || {},
+          updatedAt: serverTimestamp()
+        }
+      }, { merge: true });
+    } catch (e) { console.warn('동기화 저장 실패:', e); }
+  }
+
+  // 로컬 데이터 변경 시 → 잠깐 모았다가 클라우드로 저장(디바운스)
+  window.addEventListener('happycall-data-changed', () => {
+    if (!currentUid) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => pushToCloud(currentUid), 1200);
+  });
+
+  setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+  // --- 요소 참조 ---
+  const gate = document.getElementById('authGate');
+  const loading = document.getElementById('authLoading');
+  const form = document.getElementById('authForm');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const emailEl = document.getElementById('authEmail');
+  const pwEl = document.getElementById('authPassword');
+  const submitBtn = document.getElementById('authSubmit');
+  const googleBtn = document.getElementById('authGoogle');
+  const errorEl = document.getElementById('authError');
+  const toggleEl = document.getElementById('authToggle');
+  const toggleText = document.getElementById('authToggleText');
+  const subEl = document.getElementById('authModeSub');
+  const resetEl = document.getElementById('authReset');
+
+  let mode = 'login'; // 'login' | 'signup'
+
+  // --- 에러 메시지 한글화 ---
+  function krError(code) {
+    const map = {
+      'auth/invalid-email': '이메일 형식이 올바르지 않습니다.',
+      'auth/user-not-found': '이메일 또는 비밀번호가 올바르지 않습니다.',
+      'auth/wrong-password': '이메일 또는 비밀번호가 올바르지 않습니다.',
+      'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않습니다.',
+      'auth/email-already-in-use': '이미 가입된 이메일입니다. 로그인해 주세요.',
+      'auth/weak-password': '비밀번호는 6자 이상이어야 합니다.',
+      'auth/missing-password': '비밀번호를 입력해 주세요.',
+      'auth/popup-closed-by-user': '구글 로그인 창이 닫혔습니다.',
+      'auth/popup-blocked': '팝업이 차단되었습니다. 브라우저 팝업 허용 후 다시 시도하세요.',
+      'auth/network-request-failed': '네트워크 오류입니다. 인터넷 연결을 확인하세요.',
+      'auth/too-many-requests': '시도가 너무 많습니다. 잠시 후 다시 시도하세요.',
+      'auth/unauthorized-domain': '이 도메인은 아직 승인되지 않았습니다. 관리자에게 문의하세요.'
+    };
+    return map[code] || ('오류가 발생했습니다 (' + code + ')');
+  }
+  function showError(msg) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+  function clearError() { errorEl.style.display = 'none'; }
+
+  // --- 로그인/회원가입 모드 전환 ---
+  toggleEl.addEventListener('click', () => {
+    clearError();
+    if (mode === 'login') {
+      mode = 'signup';
+      subEl.textContent = '새 계정을 만드세요';
+      submitBtn.textContent = '회원가입';
+      toggleText.textContent = '이미 계정이 있으신가요? ';
+      toggleEl.textContent = '로그인';
+      pwEl.setAttribute('autocomplete', 'new-password');
+    } else {
+      mode = 'login';
+      subEl.textContent = '로그인하고 시작하세요';
+      submitBtn.textContent = '로그인';
+      toggleText.textContent = '계정이 없으신가요? ';
+      toggleEl.textContent = '회원가입';
+      pwEl.setAttribute('autocomplete', 'current-password');
+    }
+  });
+
+  // --- 이메일/비밀번호 제출 ---
+  async function handleSubmit() {
+    clearError();
+    const email = emailEl.value.trim();
+    const pw = pwEl.value;
+    if (!email) { showError('이메일을 입력해 주세요.'); return; }
+    if (!pw) { showError('비밀번호를 입력해 주세요.'); return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = '처리 중…';
+    try {
+      if (mode === 'login') {
+        await signInWithEmailAndPassword(auth, email, pw);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, pw);
+      }
+    } catch (e) {
+      showError(krError(e.code));
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = (mode === 'login') ? '로그인' : '회원가입';
+    }
+  }
+  submitBtn.addEventListener('click', handleSubmit);
+  pwEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSubmit(); });
+
+  // --- 구글 로그인 ---
+  googleBtn.addEventListener('click', async () => {
+    clearError();
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (e) {
+      showError(krError(e.code));
+    }
+  });
+
+  // --- 비밀번호 재설정 ---
+  resetEl.addEventListener('click', async () => {
+    clearError();
+    const email = emailEl.value.trim();
+    if (!email) { showError('재설정할 이메일을 먼저 입력해 주세요.'); return; }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showError('재설정 메일을 보냈습니다. 메일함을 확인하세요.');
+      errorEl.style.background = 'rgba(48,209,88,0.12)';
+      errorEl.style.borderColor = 'rgba(48,209,88,0.35)';
+      errorEl.style.color = '#7ee787';
+    } catch (e) {
+      showError(krError(e.code));
+    }
+  });
+
+  // --- 로그아웃 ---
+  logoutBtn.addEventListener('click', async () => {
+    try { await signOut(auth); } catch (e) {}
+  });
+
+  // --- 로그인 상태 감지 (게이트 제어) ---
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUid = user.uid;
+      gate.style.display = 'none';
+      logoutBtn.style.display = 'flex';
+      pullFromCloud(user.uid);
+    } else {
+      currentUid = null;
+      gate.style.display = 'flex';
+      loading.style.display = 'none';
+      form.style.display = 'block';
+      logoutBtn.style.display = 'none';
+    }
+  });
+</script>
+<!-- ===== /Firebase 인증 로직 ===== -->
+
 </body>
 </html>
